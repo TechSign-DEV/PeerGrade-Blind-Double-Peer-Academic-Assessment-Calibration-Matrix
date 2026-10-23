@@ -1,7 +1,27 @@
 
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import api from "../services/api";
+import "./Dashboard.css";
+
+const navigation = {
+  STUDENT: [
+    { label: "Overview", path: "/dashboard", icon: "⌂" },
+    { label: "Assignments", path: "/assignments", icon: "▤" },
+    { label: "Peer Reviews", path: "/peer-reviews", icon: "✎" },
+    { label: "My Results", path: "/results", icon: "▥" },
+  ],
+  INSTRUCTOR: [
+    { label: "Overview", path: "/dashboard", icon: "⌂" },
+    { label: "Create Assignment", path: "/assignments/create", icon: "+" },
+    { label: "Calibration", path: "/calibration", icon: "◎" },
+    { label: "Grade Management", path: "/instructor/grades", icon: "▥" },
+  ],
+  ADMIN: [
+    { label: "Overview", path: "/dashboard", icon: "⌂" },
+    { label: "Admin Panel", path: "/admin", icon: "⚙" },
+  ],
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -32,15 +52,11 @@ export default function Dashboard() {
       } catch {
         localStorage.removeItem("peergrade_token");
         localStorage.removeItem("peergrade_user");
-
-        if (mounted) {
-          navigate("/login", { replace: true });
-        }
+        if (mounted) navigate("/login", { replace: true });
       }
     }
 
     loadUser();
-
     return () => {
       mounted = false;
     };
@@ -57,14 +73,12 @@ export default function Dashboard() {
       setAssignments(
         Array.isArray(data)
           ? data
-          : Array.isArray(data.assignments)
-            ? data.assignments
-            : []
+          : data.assignments || data.data || []
       );
     } catch (err) {
       setAssignmentError(
         err.response?.data?.message ||
-          "Could not load your assignments. Please try again."
+          "Unable to load assignments."
       );
     } finally {
       setLoadingAssignments(false);
@@ -72,42 +86,36 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (user?.role === "INSTRUCTOR") {
-      fetchAssignments();
-    }
+    if (user?.role === "INSTRUCTOR") fetchAssignments();
   }, [user, fetchAssignments]);
 
-  const logout = () => {
+  function logout() {
     localStorage.removeItem("peergrade_token");
     localStorage.removeItem("peergrade_user");
     navigate("/login", { replace: true });
-  };
+  }
 
-  const allocateReviews = async (assignment) => {
-    const assignmentId = assignment._id;
+  async function allocateReviews(assignment) {
+    const id = assignment._id;
 
-    setAllocatingId(assignmentId);
+    setAllocatingId(id);
     setAssignmentError("");
-
     setAllocationResults((previous) => ({
       ...previous,
-      [assignmentId]: null,
+      [id]: null,
     }));
 
     try {
-      const response = await api.post(
-        `/reviews/allocate/${assignmentId}`
-      );
-
+      const response = await api.post(`/reviews/allocate/${id}`);
       const result = response.data.result || response.data;
 
       setAllocationResults((previous) => ({
         ...previous,
-        [assignmentId]: {
+        [id]: {
           success: true,
           message:
             response.data.message ||
-            "Peer reviews allocated successfully.",
+            "Peer review allocation processed successfully.",
           submissionsCount: result.submissionsCount,
           newReviewsAllocated: result.newReviewsAllocated,
           totalReviewAssignments: result.totalReviewAssignments,
@@ -116,7 +124,7 @@ export default function Dashboard() {
     } catch (err) {
       setAllocationResults((previous) => ({
         ...previous,
-        [assignmentId]: {
+        [id]: {
           success: false,
           message:
             err.response?.data?.message ||
@@ -126,583 +134,350 @@ export default function Dashboard() {
     } finally {
       setAllocatingId("");
     }
-  };
-
-  const content = {
-    STUDENT: {
-      title: "Student Dashboard",
-      description:
-        "Submit assignments, review assigned submissions, and view released grades.",
-      links: [
-        {
-          label: "View Assignments",
-          path: "/assignments",
-          description: "View assignments and submit your work.",
-        },
-        {
-          label: "Peer Reviews",
-          path: "/peer-reviews",
-          description: "Complete your assigned peer assessments.",
-        },
-        {
-          label: "My Results",
-          path: "/results",
-          description: "View released grades and instructor feedback.",
-        },
-      ],
-    },
-
-    INSTRUCTOR: {
-      title: "Instructor Dashboard",
-      description:
-        "Manage assignments, allocate peer reviews, and analyze grading results.",
-      links: [
-        {
-          label: "Create Assignment",
-          path: "/assignments/create",
-          description: "Create an assignment and define its rubric.",
-        },
-        {
-          label: "Calibration Dashboard",
-          path: "/calibration",
-          description: "Analyze score agreement and reviewer tendencies.",
-        },
-      ],
-    },
-
-    ADMIN: {
-      title: "Admin Dashboard",
-      description:
-        "Manage platform users, roles, account status, and system activity.",
-      links: [
-        {
-          label: "Admin Panel",
-          path: "/admin",
-          description: "Manage accounts and review platform statistics.",
-        },
-      ],
-    },
-  };
+  }
 
   if (!user) {
     return (
-      <div style={styles.center}>
-        <p>Loading dashboard...</p>
+      <div className="pg-loading">
+        <div className="pg-spinner" />
+        <p>Loading your PeerGrade workspace...</p>
       </div>
     );
   }
 
-  const dashboard = content[user.role];
+  const role = user.role;
+  const menu = navigation[role] || [];
+  const titles = {
+    STUDENT: "Student Workspace",
+    INSTRUCTOR: "Instructor Workspace",
+    ADMIN: "Administration",
+  };
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.brand}>
-          <div style={styles.logo}>P</div>
-          <div>
-            <h2 style={styles.brandTitle}>PeerGrade</h2>
-            <p style={styles.brandSubtitle}>
-              Blind Double-Peer Assessment
-            </p>
-          </div>
-        </div>
+    <div className="pg-layout">
+      <aside className="pg-sidebar">
+        <button
+          className="pg-brand"
+          onClick={() => navigate("/dashboard")}
+        >
+          <span className="pg-logo">P</span>
+          <span>
+            <strong>PeerGrade</strong>
+            <small>Academic Assessment</small>
+          </span>
+        </button>
 
-        <div style={styles.headerRight}>
-          <div style={styles.userSummary}>
-            <span style={styles.avatar}>
-              {user.name?.charAt(0)?.toUpperCase() || "U"}
-            </span>
-            <div>
-              <strong>{user.name}</strong>
-              <span style={styles.headerRole}>{user.role}</span>
-            </div>
+        <div className="pg-workspace-label">WORKSPACE</div>
+
+        <nav className="pg-navigation">
+          {menu.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === "/dashboard"}
+              className={({ isActive }) =>
+                `pg-nav-link ${isActive ? "active" : ""}`
+              }
+            >
+              <span className="pg-nav-icon">{item.icon}</span>
+              <span>{item.label}</span>
+              <span className="pg-nav-arrow">›</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="pg-sidebar-bottom">
+          <div className="pg-help-card">
+            <div className="pg-help-icon">✦</div>
+            <strong>PeerGrade</strong>
+            <p>Fair reviews. Better learning.</p>
           </div>
 
-          <button onClick={logout} style={styles.logoutButton}>
-            Logout
+          <button className="pg-logout" onClick={logout}>
+            <span>↪</span> Sign out
           </button>
         </div>
-      </header>
+      </aside>
 
-      <main style={styles.main}>
-        {!dashboard ? (
-          <section style={styles.card}>
-            <h1>Unable to load dashboard</h1>
-            <p>
-              Your account has an unrecognized role. Please contact
-              the administrator.
-            </p>
-            <button onClick={logout} style={styles.primaryButton}>
-              Return to Login
-            </button>
-          </section>
-        ) : (
-          <>
-            <section style={styles.welcome}>
-              <div>
-                <p style={styles.eyebrow}>
-                  PEERGRADE / {user.role}
-                </p>
-                <h1>Welcome, {user.name}!</h1>
-                <p style={styles.description}>
-                  {dashboard.description}
-                </p>
-              </div>
-              <div style={styles.roleBadge}>{user.role}</div>
-            </section>
+      <main className="pg-main">
+        <header className="pg-topbar">
+          <div>
+            <div className="pg-breadcrumb">
+              PeerGrade <span>/</span> {role}
+            </div>
+            <h2>{titles[role] || "Workspace"}</h2>
+          </div>
 
-            <section style={styles.accountCard}>
-              <h2>Account Information</h2>
-              <div style={styles.accountGrid}>
-                <div>
-                  <span style={styles.fieldLabel}>Full name</span>
-                  <p style={styles.fieldValue}>{user.name}</p>
-                </div>
-                <div>
-                  <span style={styles.fieldLabel}>Email address</span>
-                  <p style={styles.fieldValue}>{user.email}</p>
-                </div>
-                <div>
-                  <span style={styles.fieldLabel}>Account role</span>
-                  <p style={styles.fieldValue}>{user.role}</p>
-                </div>
-              </div>
-            </section>
+          <div className="pg-profile">
+            <div className="pg-avatar">
+              {(user.name || "U").charAt(0).toUpperCase()}
+            </div>
+            <div className="pg-profile-text">
+              <strong>{user.name || "User"}</strong>
+              <span>{role}</span>
+            </div>
+          </div>
+        </header>
 
-            <section style={styles.section}>
-              <h2>{dashboard.title}</h2>
-              <p style={styles.sectionDescription}>
-                Choose an action to continue.
+        <div className="pg-content">
+          <section className="pg-welcome">
+            <div className="pg-welcome-copy">
+              <span className="pg-eyebrow">YOUR ACADEMIC WORKSPACE</span>
+              <h1>Welcome back, {user.name || "User"} 👋</h1>
+              <p>
+                {role === "INSTRUCTOR"
+                  ? "Manage assignments, coordinate peer assessments, and release student grades."
+                  : role === "STUDENT"
+                    ? "Stay on top of assignments, complete peer reviews, and track your results."
+                    : "Manage users and oversee the PeerGrade platform."}
               </p>
+            </div>
+            <div className="pg-welcome-art" aria-hidden="true">
+              <div className="pg-art-circle">✓</div>
+              <span>Learn</span>
+              <span>Review</span>
+              <span>Improve</span>
+            </div>
+          </section>
 
-              <div style={styles.actionGrid}>
-                {dashboard.links.map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    style={styles.actionCard}
-                  >
-                    <div style={styles.actionIcon}>
-                      {item.label.charAt(0)}
-                    </div>
-                    <h3>{item.label}</h3>
-                    <p style={styles.actionDescription}>
-                      {item.description}
-                    </p>
-                    <span style={styles.actionLink}>
-                      Open page →
-                    </span>
-                  </Link>
-                ))}
+          <section className="pg-section">
+            <div className="pg-section-heading">
+              <div>
+                <h2>Quick Access</h2>
+                <p>Choose where you want to go next.</p>
               </div>
-            </section>
+            </div>
 
-            {user.role === "INSTRUCTOR" && (
-              <section style={styles.section}>
-                <div style={styles.listHeader}>
-                  <div>
-                    <h2>My Assignments</h2>
-                    <p style={styles.sectionDescription}>
-                      Manage your assignments and allocate blind peer
-                      reviews directly from here.
-                    </p>
-                  </div>
-
+            <div className="pg-quick-grid">
+              {menu
+                .filter((item) => item.path !== "/dashboard")
+                .map((item, index) => (
                   <button
-                    type="button"
+                    className="pg-quick-card"
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <span className={`pg-quick-icon tone-${index % 4}`}>
+                      {item.icon}
+                    </span>
+                    <span className="pg-quick-title">{item.label}</span>
+                    <span className="pg-quick-description">
+                      {item.path === "/instructor/grades"
+                        ? "Calculate, review, and release grades."
+                        : item.path === "/assignments/create"
+                          ? "Create assignments and grading rubrics."
+                          : item.path === "/calibration"
+                            ? "Inspect reviewer scoring patterns."
+                            : item.path === "/peer-reviews"
+                              ? "Review assigned student submissions."
+                              : item.path === "/results"
+                                ? "View your released results."
+                                : item.path === "/assignments"
+                                  ? "View and submit coursework."
+                                  : "Open this workspace."}
+                    </span>
+                    <span className="pg-card-link">Open workspace →</span>
+                  </button>
+                ))}
+            </div>
+          </section>
+
+          <section className="pg-section pg-account">
+            <div className="pg-section-heading">
+              <div>
+                <h2>Account Information</h2>
+                <p>Your signed-in account details.</p>
+              </div>
+              <span className="pg-role-pill">{role}</span>
+            </div>
+
+            <div className="pg-account-grid">
+              <div className="pg-account-item">
+                <span>FULL NAME</span>
+                <strong>{user.name || "Not provided"}</strong>
+              </div>
+              <div className="pg-account-item">
+                <span>EMAIL ADDRESS</span>
+                <strong>{user.email || "Not provided"}</strong>
+              </div>
+              <div className="pg-account-item">
+                <span>ACCOUNT ROLE</span>
+                <strong>{role}</strong>
+              </div>
+            </div>
+          </section>
+
+          {role === "INSTRUCTOR" && (
+            <section className="pg-section">
+              <div className="pg-section-heading pg-assignment-heading">
+                <div>
+                  <h2>My Assignments</h2>
+                  <p>
+                    Allocate reviews and manage grades from each assignment.
+                  </p>
+                </div>
+
+                <div className="pg-heading-actions">
+                  <button
+                    className="pg-button pg-button-light"
                     onClick={fetchAssignments}
                     disabled={loadingAssignments}
-                    style={styles.secondaryButton}
                   >
-                    {loadingAssignments ? "Loading..." : "Refresh"}
+                    {loadingAssignments ? "Refreshing..." : "↻ Refresh"}
+                  </button>
+                  <button
+                    className="pg-button pg-button-primary"
+                    onClick={() => navigate("/assignments/create")}
+                  >
+                    + New Assignment
                   </button>
                 </div>
+              </div>
 
-                {assignmentError && (
-                  <div style={styles.error} role="alert">
-                    {assignmentError}
-                  </div>
-                )}
+              {assignmentError && (
+                <div className="pg-alert pg-alert-error">
+                  {assignmentError}
+                </div>
+              )}
 
-                {loadingAssignments ? (
-                  <p>Loading your assignments...</p>
-                ) : assignments.length === 0 ? (
-                  <div style={styles.card}>
-                    <p>
-                      No assignments found. Create an assignment first.
-                    </p>
-                    <Link to="/assignments/create">
-                      Create Assignment →
-                    </Link>
-                  </div>
-                ) : (
-                  <div style={styles.assignmentGrid}>
-                    {assignments.map((assignment) => {
-                      const result =
-                        allocationResults[assignment._id];
+              {loadingAssignments ? (
+                <div className="pg-empty">Loading assignments...</div>
+              ) : assignments.length === 0 ? (
+                <div className="pg-empty">
+                  <div className="pg-empty-icon">▤</div>
+                  <h3>No assignments yet</h3>
+                  <p>Create your first assignment to get started.</p>
+                  <button
+                    className="pg-button pg-button-primary"
+                    onClick={() => navigate("/assignments/create")}
+                  >
+                    Create Assignment
+                  </button>
+                </div>
+              ) : (
+                <div className="pg-assignment-list">
+                  {assignments.map((assignment) => {
+                    const result = allocationResults[assignment._id];
 
-                      return (
-                        <article
-                          key={assignment._id}
-                          style={styles.assignmentCard}
-                        >
-                          <div style={styles.assignmentHeader}>
+                    return (
+                      <article
+                        key={assignment._id}
+                        className="pg-assignment-card"
+                      >
+                        <div className="pg-assignment-top">
+                          <div className="pg-assignment-symbol">▤</div>
+                          <div className="pg-assignment-name">
                             <h3>{assignment.title}</h3>
-                            <span style={styles.status}>
-                              {assignment.status || "PUBLISHED"}
-                            </span>
+                            <p>
+                              {assignment.courseName ||
+                                assignment.course ||
+                                "Course not specified"}
+                            </p>
                           </div>
+                          <span className="pg-status">
+                            {assignment.status || "PUBLISHED"}
+                          </span>
+                        </div>
 
-                          <p>
-                            <strong>Course:</strong>{" "}
-                            {assignment.courseName || "Not specified"}
-                          </p>
+                        <div className="pg-assignment-meta">
+                          <div>
+                            <span>MAXIMUM MARKS</span>
+                            <strong>{assignment.maxMarks ?? "—"}</strong>
+                          </div>
+                          <div>
+                            <span>DEADLINE</span>
+                            <strong>
+                              {assignment.deadline
+                                ? new Date(
+                                    assignment.deadline
+                                  ).toLocaleString()
+                                : "Not specified"}
+                            </strong>
+                          </div>
+                        </div>
 
-                          <p>
-                            <strong>Maximum marks:</strong>{" "}
-                            {assignment.maxMarks}
-                          </p>
-
-                          <p>
-                            <strong>Deadline:</strong>{" "}
-                            {assignment.deadline
-                              ? new Date(
-                                  assignment.deadline
-                                ).toLocaleString()
-                              : "Not specified"}
-                          </p>
-
+                        <div className="pg-assignment-actions">
                           <button
-                            type="button"
-                            onClick={() =>
-                              allocateReviews(assignment)
-                            }
-                            disabled={
-                              allocatingId === assignment._id
-                            }
-                            style={styles.primaryButton}
+                            className="pg-button pg-button-primary"
+                            onClick={() => allocateReviews(assignment)}
+                            disabled={allocatingId === assignment._id}
                           >
                             {allocatingId === assignment._id
-                              ? "Allocating Reviews..."
-                              : "Allocate Peer Reviews"}
+                              ? "Allocating..."
+                              : "⇄ Allocate Peer Reviews"}
                           </button>
 
-<button
-  onClick={() =>
-    navigate(`/instructor/grades?assignmentId=${assignment._id}`)
-  }
->
-  Grade Management
-</button>
+                          <button
+                            className="pg-button pg-button-outline"
+                            onClick={() =>
+                              navigate(
+                                `/instructor/grades?assignmentId=${assignment._id}`
+                              )
+                            }
+                          >
+                            ▥ Grade Management
+                          </button>
 
-                          {result && (
-                            <div
-                              style={
-                                result.success
-                                  ? styles.success
-                                  : styles.error
-                              }
-                              role="status"
-                            >
-                              <strong>
-                                {result.success
-                                  ? "Allocation result"
-                                  : "Allocation failed"}
-                              </strong>
-                              <p>{result.message}</p>
+                          <button
+                            className="pg-button pg-button-light"
+                            onClick={() => navigate("/calibration")}
+                          >
+                            ◎ Calibration
+                          </button>
+                        </div>
 
-                              {result.success && (
-                                <>
-                                  <p>
-                                    Submissions:{" "}
+                        {result && (
+                          <div
+                            className={`pg-allocation-result ${
+                              result.success ? "result-success" : "result-error"
+                            }`}
+                            role="status"
+                          >
+                            <strong>
+                              {result.success
+                                ? "✓ Allocation result"
+                                : "Allocation failed"}
+                            </strong>
+                            <p>{result.message}</p>
+
+                            {result.success && (
+                              <div className="pg-result-stats">
+                                <div>
+                                  <span>Submissions</span>
+                                  <strong>
                                     {result.submissionsCount ?? "—"}
-                                  </p>
-                                  <p>
-                                    New reviews allocated:{" "}
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span>New reviews</span>
+                                  <strong>
                                     {result.newReviewsAllocated ?? "—"}
-                                  </p>
-                                  <p>
-                                    Total review assignments:{" "}
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span>Total assignments</span>
+                                  <strong>
                                     {result.totalReviewAssignments ?? "—"}
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            )}
-          </>
-        )}
-      </main>
+                                  </strong>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+        </div>
 
-      <footer style={styles.footer}>
-        PeerGrade · Blind Double-Peer Academic Assessment
-      </footer>
+        <footer className="pg-footer">
+          <span>PeerGrade</span>
+          <span>Blind Double-Peer Academic Assessment</span>
+        </footer>
+      </main>
     </div>
   );
 }
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#f5f7fb",
-    color: "#182237",
-    fontFamily: "Arial, sans-serif",
-  },
-  center: {
-    minHeight: "100vh",
-    display: "grid",
-    placeItems: "center",
-  },
-  header: {
-    background: "#fff",
-    borderBottom: "1px solid #e5e7eb",
-    padding: "18px 32px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "20px",
-    flexWrap: "wrap",
-  },
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  logo: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "12px",
-    background: "#4338ca",
-    color: "#fff",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "24px",
-    fontWeight: "bold",
-  },
-  brandTitle: { margin: 0, fontSize: "21px" },
-  brandSubtitle: {
-    margin: "4px 0 0",
-    fontSize: "12px",
-    color: "#64748b",
-  },
-  headerRight: {
-    display: "flex",
-    alignItems: "center",
-    gap: "20px",
-    flexWrap: "wrap",
-  },
-  userSummary: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    fontSize: "13px",
-  },
-  avatar: {
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    background: "#eef2ff",
-    color: "#4338ca",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "17px",
-    fontWeight: "bold",
-  },
-  headerRole: {
-    display: "block",
-    marginTop: "4px",
-    fontSize: "11px",
-    color: "#64748b",
-  },
-  logoutButton: {
-    padding: "10px 16px",
-    border: "1px solid #e5e7eb",
-    borderRadius: "9px",
-    background: "#fff",
-    color: "#b91c1c",
-    fontWeight: "bold",
-    cursor: "pointer",
-  },
-  main: {
-    maxWidth: "1200px",
-    margin: "0 auto",
-    padding: "32px 24px",
-  },
-  welcome: {
-    padding: "30px",
-    borderRadius: "16px",
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "20px",
-    flexWrap: "wrap",
-  },
-  eyebrow: {
-    margin: "0 0 10px",
-    color: "#4f46e5",
-    fontSize: "12px",
-    fontWeight: "bold",
-    letterSpacing: "1.4px",
-  },
-  roleBadge: {
-    padding: "8px 12px",
-    background: "#eef2ff",
-    color: "#4338ca",
-    borderRadius: "8px",
-    fontSize: "12px",
-    fontWeight: "bold",
-  },
-  description: {
-    maxWidth: "650px",
-    color: "#64748b",
-    lineHeight: 1.7,
-  },
-  accountCard: {
-    marginTop: "24px",
-    padding: "24px",
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: "14px",
-  },
-  accountGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "24px",
-    marginTop: "20px",
-  },
-  fieldLabel: { color: "#64748b", fontSize: "12px" },
-  fieldValue: {
-    marginBottom: 0,
-    fontWeight: "bold",
-    overflowWrap: "anywhere",
-  },
-  section: { marginTop: "36px" },
-  sectionDescription: {
-    color: "#64748b",
-    marginTop: "6px",
-    lineHeight: 1.6,
-  },
-  actionGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: "20px",
-  },
-  actionCard: {
-    display: "block",
-    padding: "24px",
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: "14px",
-    textDecoration: "none",
-    color: "#182237",
-    boxShadow: "0 4px 16px rgba(20, 30, 60, 0.03)",
-  },
-  actionIcon: {
-    width: "42px",
-    height: "42px",
-    display: "grid",
-    placeItems: "center",
-    borderRadius: "11px",
-    background: "#eef2ff",
-    color: "#4338ca",
-    fontSize: "20px",
-    fontWeight: "bold",
-  },
-  actionDescription: {
-    minHeight: "44px",
-    color: "#64748b",
-    fontSize: "14px",
-    lineHeight: 1.6,
-  },
-  actionLink: {
-    display: "inline-block",
-    marginTop: "10px",
-    color: "#4338ca",
-    fontSize: "13px",
-    fontWeight: "bold",
-  },
-  listHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
-    flexWrap: "wrap",
-    marginBottom: "18px",
-  },
-  assignmentGrid: { display: "grid", gap: "16px" },
-  assignmentCard: {
-    padding: "22px",
-    border: "1px solid #e5e7eb",
-    borderRadius: "14px",
-    background: "#fff",
-    overflowWrap: "anywhere",
-  },
-  assignmentHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-  status: {
-    background: "#eef2ff",
-    color: "#4338ca",
-    padding: "6px 10px",
-    borderRadius: "20px",
-    fontSize: "12px",
-    fontWeight: "bold",
-  },
-  primaryButton: {
-    padding: "11px 16px",
-    background: "#4338ca",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-  secondaryButton: {
-    padding: "10px 14px",
-    background: "#fff",
-    color: "#4338ca",
-    border: "1px solid #c7d2fe",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-  card: {
-    background: "#fff",
-    padding: "28px",
-    borderRadius: "14px",
-    border: "1px solid #e5e7eb",
-  },
-  success: {
-    marginTop: "16px",
-    padding: "14px",
-    borderRadius: "9px",
-    background: "#dcfce7",
-    color: "#166534",
-    overflowWrap: "anywhere",
-  },
-  error: {
-    marginTop: "16px",
-    padding: "14px",
-    borderRadius: "9px",
-    background: "#fee2e2",
-    color: "#991b1b",
-    overflowWrap: "anywhere",
-  },
-  footer: {
-    padding: "24px",
-    textAlign: "center",
-    color: "#64748b",
-    fontSize: "12px",
-  },
-};

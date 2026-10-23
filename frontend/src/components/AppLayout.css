@@ -1,0 +1,27 @@
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  background: #f7f8fc;
+}
+
+.app-layout-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-layout-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #f7f8fc;
+  color: #5145cd;
+  font-family: Arial, sans-serif;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .app-layout {
+    display: block;
+  }
+}

@@ -16,8 +16,8 @@ import CalibrationDashboard from "./pages/CalibrationDashboard";
 import StudentResults from "./pages/StudentResults";
 import AdminDashboard from "./pages/AdminDashboard";
 import InstructorGrades from "./pages/InstructorGrades";
+import AppLayout from "./components/AppLayout";
 
-// Basic frontend route protection
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("peergrade_token");
 
@@ -32,93 +32,40 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public routes */}
         <Route
           path="/"
           element={<Navigate to="/login" replace />}
         />
-
-        {/* Public routes */}
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
 
-        {/* Main dashboard */}
+        {/* Shared authenticated layout */}
         <Route
-          path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <AppLayout />
             </ProtectedRoute>
           }
-        />
-
-        {/* Assignment routes */}
-        <Route
-          path="/assignments"
-          element={
-            <ProtectedRoute>
-              <StudentAssignments />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/assignments/create"
-          element={
-            <ProtectedRoute>
-              <CreateAssignment />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Peer review */}
-        <Route
-          path="/peer-reviews"
-          element={
-            <ProtectedRoute>
-              <PeerReview />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Instructor calibration */}
-        <Route
-          path="/calibration"
-          element={
-            <ProtectedRoute>
-              <CalibrationDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* NEW: Instructor Grade Management */}
-        <Route
-          path="/instructor/grades"
-          element={
-            <ProtectedRoute>
-              <InstructorGrades />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Student results */}
-        <Route
-          path="/results"
-          element={
-            <ProtectedRoute>
-              <StudentResults />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Admin */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/assignments" element={<StudentAssignments />} />
+          <Route
+            path="/assignments/create"
+            element={<CreateAssignment />}
+          />
+          <Route path="/peer-reviews" element={<PeerReview />} />
+          <Route
+            path="/calibration"
+            element={<CalibrationDashboard />}
+          />
+          <Route
+            path="/instructor/grades"
+            element={<InstructorGrades />}
+          />
+          <Route path="/results" element={<StudentResults />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+        </Route>
 
         {/* Unknown routes */}
         <Route
